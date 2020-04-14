@@ -1,5 +1,5 @@
 {
-  "name": "",
+  "name": "login",
   "version": "0.0.0",
   "description": "",
   "main": "build/src/index.js",
@@ -20,8 +20,22 @@
     "posttest": "npm.cmd run check"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.2",
+    "@types/dotenv": "^8.2.0",
+    "@types/express": "^4.17.6",
+    "@types/express-session": "^1.17.0",
+    "@types/node": "^10.0.3",
+    "@types/passport-azure-ad": "^4.0.5",
+    "@types/simple-oauth2": "^2.5.2",
     "gts": "^2.0.0",
-    "typescript": "~3.8.0",
-    "@types/node": "^10.0.3"
+    "typescript": "~3.8.0"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.5",
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "express-session": "^1.17.0",
+    "passport-azure-ad": "^4.2.1",
+    "simple-oauth2": "^3.4.0"
   }
 }
