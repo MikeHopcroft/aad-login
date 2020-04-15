@@ -1,50 +1,47 @@
-import { createServer, Server } from 'http';
-
-// var graph = require('./graph');
-import * as dotenv from 'dotenv';
-dotenv.config();
-
-// var session = require('express-session');
-import * as session from 'express-session';
-// var flash = require('connect-flash');
-
-var createError = require('http-errors');
-// var express = require('express');
-import * as express from 'express';
-// var path = require('path');
 import * as cookieParser from 'cookie-parser';
-// var cookieParser = require('cookie-parser');
-// var logger = require('morgan');
-
-
-// var passport = require('passport');
+import * as dotenv from 'dotenv';
+import * as express from 'express';
+import * as session from 'express-session';
+import { createServer } from 'http';
+import * as createHttpError from 'http-errors';
+import * as oAuth2 from 'simple-oauth2';
 import * as passport from 'passport';
-// var OIDCStrategy = require('passport-azure-ad').OIDCStrategy;
 import { IProfile, OIDCStrategy, VerifyCallback } from 'passport-azure-ad';
 
+import { createAuthRouter } from './auth-router';
 
+dotenv.config();
+
+///////////////////////////////////////////////////////////////////////////////
+//
 // Configure passport
+//
+///////////////////////////////////////////////////////////////////////////////
 
 // In-memory storage of logged-in users
 // For demo purposes only, production apps should store
 // this in a reliable storage
-var users: {[key:string]:any} = {};
+var users: { [key: string]: any } = {};
 
 // Passport calls serializeUser and deserializeUser to
 // manage users
-passport.serializeUser(function(user:any, done) {
+passport.serializeUser(function (user: any, done) {
   // Use the OID property of the user as a key
   users[user.profile.oid] = user;
-  done (null, user.profile.oid);
+  done(null, user.profile.oid);
 });
 
-passport.deserializeUser(function(id:string, done) {
+passport.deserializeUser(function (id: string, done) {
   done(null, users[id]);
 });
 
+
+///////////////////////////////////////////////////////////////////////////////
+//
 // Configure simple-oauth2
-import * as OAuth2 from 'simple-oauth2';
-const oauth2 = OAuth2.create({
+//
+///////////////////////////////////////////////////////////////////////////////
+const oAuth2Client = oAuth2.create({
   client: {
     id: process.env.OAUTH_APP_ID!,
     secret: process.env.OAUTH_APP_PASSWORD!
@@ -56,81 +53,41 @@ const oauth2 = OAuth2.create({
   }
 });
 
-// Callback function called once the sign-in is complete
-// and an access token has been obtained
-// async function signInComplete(iss, sub, profile, accessToken, refreshToken, params, done) {
-//   if (!profile.oid) {
-//     return done(new Error("No OID found in user profile."), null);
-//   }
-
-//   // Save the profile and tokens in user storage
-//   users[profile.oid] = { profile, accessToken };
-//   return done(null, users[profile.oid]);
-// }
-
-// async function signInComplete(iss, sub, profile, accessToken, refreshToken, params, done) {
-//   if (!profile.oid) {
-//     return done(new Error("No OID found in user profile."), null);
-//   }
-
-//   try{
-//     const user = await graph.getUserDetails(accessToken);
-
-//     if (user) {
-//       // Add properties to profile
-//       profile['email'] = user.mail ? user.mail : user.userPrincipalName;
-//     }
-//   } catch (err) {
-//     done(err, null);
-//   }
-
-//   // Save the profile and tokens in user storage
-//   users[profile.oid] = { profile, accessToken };
-//   return done(null, users[profile.oid]);
-// }
-
 async function signInComplete(
-    iss: string,
-    sub: string,
-    profile: IProfile,
-    accessToken: string,
-    refreshToken: string,
-    params: any,
-    done: VerifyCallback
-) {
+  iss: string,
+  sub: string,
+  profile: IProfile,
+  accessToken: string,
+  refreshToken: string,
+  params: any,
+  done: VerifyCallback
+): Promise<void> {
   console.log('signInComplete');
   console.log(JSON.stringify(params, null, 2));
 
+  // TODO: should we throw an error here?
   if (!profile.oid) {
     return done(new Error("No OID found in user profile."), null);
   }
 
-//   try{
-//     const user = await graph.getUserDetails(accessToken);
-
-//     if (user) {
-//       // Add properties to profile
-//       profile['email'] = user.mail ? user.mail : user.userPrincipalName;
-//     }
-//   } catch (err) {
-//     done(err, null);
-//   }
-
+  // TODO: write portions of params to disk here.
+  //   access_token
+  //   refresh_token
+  //   expires_in
+  // See https://github.com/lelylan/simple-oauth2#access-token-object
 
   // Create a simple-oauth2 token from raw tokens
-  let oauthToken = oauth2.accessToken.create(params);
+  let oauthToken = oAuth2Client.accessToken.create(params);
   console.log(oauthToken);
 
   // Save the profile and tokens in user storage
   users[profile.oid] = { profile, oauthToken };
-  return done(null, users[profile.oid]);
 
-  // return done(null, null);
+  return done(null, users[profile.oid]);
 }
 
-
 // Configure OIDC strategy
-passport.use(new OIDCStrategy(
+const strategy = new OIDCStrategy(
   {
     identityMetadata: `${process.env.OAUTH_AUTHORITY}${process.env.OAUTH_ID_METADATA}`,
     clientID: process.env.OAUTH_APP_ID!,
@@ -144,17 +101,16 @@ passport.use(new OIDCStrategy(
     scope: process.env.OAUTH_SCOPES!.split(' ')
   },
   signInComplete
-));
+);
+
+passport.use(strategy);
 
 
-// var indexRouter = require('./routes/index');
-// var usersRouter = require('./routes/users');
-
-
-// var authRouter = require('./routes/auth');
-
-import { authRouter } from './auth-router';
-
+///////////////////////////////////////////////////////////////////////////////
+//
+// Configure express
+//
+///////////////////////////////////////////////////////////////////////////////
 var app = express();
 
 // Session middleware
@@ -167,82 +123,39 @@ app.use(session({
   unset: 'destroy'
 }));
 
-// app.use(function(req, res, next) {
-//   // Set the authenticated user in the
-//   // template locals
-//   if (req.user) {
-//     res.locals.user = req.user.profile;
-//   }
-//   next();
-// });
-
-// // Flash middleware
-// app.use(flash());
-
-// // Set up local vars for template layout
-// app.use(function(req, res, next) {
-//   // Read any flashed errors and save
-//   // in the response locals
-//   res.locals.error = req.flash('error_msg');
-
-//   // Check for simple error string and
-//   // convert to layout's expected format
-//   var errs = req.flash('error');
-//   for (var i in errs){
-//     res.locals.error.push({message: 'An error occurred', debug: errs[i]});
-//   }
-
-//   next();
-// });
-
-
-
-// // view engine setup
-// app.set('views', path.join(__dirname, 'views'));
-// app.set('view engine', 'hbs');
-app.set('view engine', 'defaultEngine');
-
 // app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 // app.use(express.static(path.join(__dirname, 'public')));
 
-
 // Initialize passport
 app.use(passport.initialize());
 app.use(passport.session());
 
-
-// app.use('/', indexRouter);
-app.use('/auth', authRouter);
-// app.use('/users', usersRouter);
+app.use('/auth', createAuthRouter());
 
 // catch 404 and forward to error handler
-app.use(function(req, res, next) {
-  next(createError(404));
+app.use(function (req, res, next) {
+  next(createHttpError(404));
 });
 
 // error handler
 app.use((
-  // err,
-  // req,
-  // res,
-  // next
-  err: Error,
+  err: Error | createHttpError.HttpError,
   req: express.Request,
   res: express.Response,
   next: express.NextFunction
 ) => {
-  // // set locals, only providing error in development
-  // res.locals.message = err.message;
-  // res.locals.error = req.app.get('env') === 'development' ? err : {};
-
-  // // render the error page
-  // res.status(err.status || 500);
   console.log('error:' + JSON.stringify(err, null, 4));
-  res.status(500);
-  // res.render('error');
+  if ('status' in err) {
+    res.status(err.status);
+  } else {
+    res.status(500);
+  }
+
+  // TODO: better rendering here.
+  res.json(err);
 });
 
 const server = createServer(app);
