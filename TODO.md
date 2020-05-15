@@ -1,12 +1,13 @@
 # Todo list
 
 * Top
-  * Cleanup code
+  * x Cleanup code
   * Encapsulate app in class or function.
   * Encapsulate passport initialization in class or function
     * Investigate passport.initialize()
     * Investigate passport.session()
     * Also passport methods serializeUser(), deserializeUser(), and use().
+  * Encapsulate entire auth process in class.
   * VSCode tab spacing configuration
   * Delete index.ts
   * Not found error on /success after navigating to /auth/success
@@ -33,6 +34,7 @@
   * Write tokenObject to disk
   * Read tokenObject from disk and validate
   * Logged-in state detection and logic
+    * Investigate how user triggers login when credentials are revoked.
   * Message with URL
   * Open browser
 * Basic console application

@@ -4,6 +4,7 @@ import * as express from 'express';
 import * as session from 'express-session';
 import { createServer } from 'http';
 import * as createHttpError from 'http-errors';
+import * as open from 'open';
 import * as oAuth2 from 'simple-oauth2';
 import * as passport from 'passport';
 import { IProfile, OIDCStrategy, VerifyCallback } from 'passport-azure-ad';
@@ -86,79 +87,85 @@ async function signInComplete(
   return done(null, users[profile.oid]);
 }
 
-// Configure OIDC strategy
-const strategy = new OIDCStrategy(
-  {
-    identityMetadata: `${process.env.OAUTH_AUTHORITY}${process.env.OAUTH_ID_METADATA}`,
-    clientID: process.env.OAUTH_APP_ID!,
-    responseType: 'code id_token',
-    responseMode: 'form_post',
-    redirectUrl: process.env.OAUTH_REDIRECT_URI!,
-    allowHttpForRedirectUrl: true,
-    clientSecret: process.env.OAUTH_APP_PASSWORD,
-    validateIssuer: false,
-    passReqToCallback: false,
-    scope: process.env.OAUTH_SCOPES!.split(' ')
-  },
-  signInComplete
-);
 
-passport.use(strategy);
+async function go() {
+  // Configure OIDC strategy
+  const strategy = new OIDCStrategy(
+    {
+      identityMetadata: `${process.env.OAUTH_AUTHORITY}${process.env.OAUTH_ID_METADATA}`,
+      clientID: process.env.OAUTH_APP_ID!,
+      responseType: 'code id_token',
+      responseMode: 'form_post',
+      redirectUrl: process.env.OAUTH_REDIRECT_URI!,
+      allowHttpForRedirectUrl: true,
+      clientSecret: process.env.OAUTH_APP_PASSWORD,
+      validateIssuer: false,
+      passReqToCallback: false,
+      scope: process.env.OAUTH_SCOPES!.split(' ')
+    },
+    signInComplete
+  );
+
+  passport.use(strategy);
 
 
-///////////////////////////////////////////////////////////////////////////////
-//
-// Configure express
-//
-///////////////////////////////////////////////////////////////////////////////
-var app = express();
+  ///////////////////////////////////////////////////////////////////////////////
+  //
+  // Configure express
+  //
+  ///////////////////////////////////////////////////////////////////////////////
+  var app = express();
 
-// Session middleware
-// NOTE: Uses default in-memory session store, which is not
-// suitable for production
-app.use(session({
-  secret: 'your_secret_value_here',
-  resave: false,
-  saveUninitialized: false,
-  unset: 'destroy'
-}));
+  // Session middleware
+  // NOTE: Uses default in-memory session store, which is not
+  // suitable for production
+  app.use(session({
+    secret: 'your_secret_value_here',
+    resave: false,
+    saveUninitialized: false,
+    unset: 'destroy'
+  }));
 
-// app.use(logger('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser());
-// app.use(express.static(path.join(__dirname, 'public')));
+  // app.use(logger('dev'));
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: false }));
+  app.use(cookieParser());
+  // app.use(express.static(path.join(__dirname, 'public')));
 
-// Initialize passport
-app.use(passport.initialize());
-app.use(passport.session());
+  // Initialize passport
+  app.use(passport.initialize());
+  app.use(passport.session());
 
-app.use('/auth', createAuthRouter());
+  app.use('/auth', createAuthRouter());
 
-// catch 404 and forward to error handler
-app.use(function (req, res, next) {
-  next(createHttpError(404));
-});
+  // catch 404 and forward to error handler
+  app.use(function (req, res, next) {
+    next(createHttpError(404));
+  });
 
-// error handler
-app.use((
-  err: Error | createHttpError.HttpError,
-  req: express.Request,
-  res: express.Response,
-  next: express.NextFunction
-) => {
-  console.log('error:' + JSON.stringify(err, null, 4));
-  if ('status' in err) {
-    res.status(err.status);
-  } else {
-    res.status(500);
-  }
+  // error handler
+  app.use((
+    err: Error | createHttpError.HttpError,
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) => {
+    console.log('error:' + JSON.stringify(err, null, 4));
+    if ('status' in err) {
+      res.status(err.status);
+    } else {
+      res.status(500);
+    }
 
-  // TODO: better rendering here.
-  res.json(err);
-});
+    // TODO: better rendering here.
+    res.json(err);
+  });
 
-const server = createServer(app);
-const port = 3000;
-server.listen(port);
-console.info(`Service listening on port ${port}.`);
+  const server = createServer(app);
+  const port = 3000;
+  server.listen(port);
+  console.info(`Service listening on port ${port}.`);
+  await open('http://localhost:3000/auth/signin');
+}
+
+go();
